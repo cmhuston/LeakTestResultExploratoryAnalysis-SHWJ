@@ -117,6 +117,9 @@ Extract.InspectionData = function(InputFile) {
   
   #clean spacer at barcode
   dt[ , part_id := as.character(gsub("    ", "", part_id))]
+  
+  # Convert dat time into correct format
+  dt$datetime <- as.POSIXct(dt$datetime,format="%d/%m/%Y %H:%M")
  
   dt <- dt[order(dt$datetime), ]
  
@@ -141,12 +144,110 @@ Extract.TempHumidity = function(InputFile) {
   #Convert to data table
   dt <- data.table(dt)
 
+  # convert date & time into POSIXct Format
+  dt$Date <- as.Date(dt$Date, format = "%d/%m/%Y")
+  dt$Date.Time <- as.POSIXct(dt$Date.Time,format="%d/%m/%Y %H:%M")
+  
   #sort in oredr of test date
   dt <- dt[order(dt$Date.Time, decreasing = FALSE),]
 
   saveRDS(dt, "DataOutput/dt.TempHumidity.RDS")        
   
 }
+
+Extract.PinningStation = function(InputFile) {
+  
+  ## Extract raw data from tsv file. 
+  ## All processed data include duplicates and was sorted in order of time/part_id. Row contained NA was removed.  
+  ## Duplicates was included here
+  
+  # #test variable
+  # InputFile <- c("DataSource/QUK2SH_WJ_Pinning.tsv")
+  
+  #Read TSV file
+  dt <- read.table(InputFile, sep = '\t', header = TRUE, stringsAsFactors = FALSE)
+  
+  #Convert to data table
+  dt <- data.table(dt)
+  
+  #Keep only XBA parts
+  dt <- dt[grepl("XBA",dt$part_id, ignore.case=TRUE), ]
+  
+  #Assemble Date/Time
+  dt$PinningDateTime <- ymd_hms(paste0(dt$time_year,"-",dt$time_month,"-", dt$time_day," ", dt$time_hour,":", dt$time_minute,":",dt$time_second))
+  
+  #sort in oredr of part id then test date
+  dt <- dt[order(dt$PinningDateTime, decreasing = FALSE),]
+  
+  saveRDS(dt, "DataOutput/dt.Pinning.RDS")        
+  
+}
+
+KeepOldestRecord.PinningStation = function(dt) {
+  
+  ## This function is to removed duplicates by keeping only the oldest record of each part id.
+  
+  # Sort as per order of part id, then time. 
+  # Keep only the earliest record of the same part ID
+  dt <- dt[order(dt$part_id, dt$PinningDateTime,  decreasing = FALSE),]
+  dt <- dt[!duplicated(dt$part_id),]
+  
+  #sort in oredr of part id then test date
+  dt <- dt[order(dt$PinningDateTime, decreasing = FALSE),]
+  
+  return(dt)
+  
+}
+
+
+Extract.FIPGStation = function(InputFile) {
+  
+  ## Extract raw data from tsv file. 
+  ## All processed data include duplicates and was sorted in order of time/part_id. Row contained NA was removed.  
+  ## Duplicates was included here
+  
+  # #test variable
+  # InputFile <- c("DataSource/QUK2SH_WJ_FIPG_Bolting.tsv")
+  
+  #Read TSV file
+  dt <- read.table(InputFile, sep = '\t', header = TRUE, stringsAsFactors = FALSE)
+  
+  #Convert to data table
+  dt <- data.table(dt)
+  
+  #Keep only XBA parts
+  dt <- dt[grepl("XBA",dt$part_id, ignore.case=TRUE), ]
+  
+  #Assemble Date/Time
+  dt$FIPGDateTime <- ymd_hms(paste0(dt$time_year,"-",dt$time_month,"-", dt$time_day," ", dt$time_hour,":", dt$time_minute,":",dt$time_second))
+  
+  #sort in oredr of part id then test date
+  dt <- dt[order(dt$FIPGDateTime, decreasing = FALSE),]
+  
+  saveRDS(dt, "DataOutput/dt.FIPG.RDS")        
+  
+}
+
+
+KeepOldestRecord.FIPGStation = function(dt) {
+  
+  ## This function is to removed duplicates by keeping only the oldest record of each part id.
+  
+  # # Test Variables
+  # dt <- dt.FIPG.Full
+  
+  # Sort as per order of part id, then time. 
+  # Keep only the earliest record of the same part ID
+  dt <- dt[order(dt$part_id, dt$FIPGDateTime,  decreasing = FALSE),]
+  dt <- dt[!duplicated(dt$part_id),]
+  
+  #sort in oredr of part id then test date
+  dt <- dt[order(dt$FIPGDateTime, decreasing = FALSE),]
+  
+  return(dt)
+  
+}
+
 
 Process.LeakTest.Result.WP = function(dt) {
       ## Add additional column of leak test result baed on spec
@@ -402,7 +503,7 @@ Daily.Statics.AirDecay.He = function(dt.source, lsl, usl) {
   return(dt) 
 }
 
-RemoveDuplicates.KeepLatest = function(dt) {
+KeepLatestRecord.AirDecay = function(dt) {
           #Remove duplicates
           dt <- dt[ , .SD[.N] ,  by = c("part_id") ]
           
@@ -412,7 +513,39 @@ RemoveDuplicates.KeepLatest = function(dt) {
           return(dt)
 }
 
-Sum.Stat.AirDecay.WP = function(dt, Date.Start, Date.End) {
+KeepOldestRecord.AirDecay = function(dt) {
+  # # Test Variables
+  # dt <- dt.AirDecay.WP.NoMaster
+  
+  # Sort as per order of part id, then time. 
+  # Keep only the earliest record of the same part ID
+  dt <- dt[order(dt$part_id, dt$LeakTestDateTime,  decreasing = FALSE),]
+  dt <- dt[!duplicated(dt$part_id),]
+  
+  #sort in oredr of test date
+  dt <- dt[order(dt$LeakTestDateTime, decreasing = FALSE),]
+  
+  return(dt)
+}
+
+
+KeepOldestRecord.Inspction = function(dt) {
+      # # Test Variables
+      # dt <- dt.Inspection.Gate1
+      
+      # Sort as per order of part id, then time. 
+      # Keep only the earliest record of the same part ID
+      dt <- dt[order(dt$part_id, dt$datetime,  decreasing = FALSE),]
+      dt <- dt[!duplicated(dt$part_id),]
+      
+      #sort in oredr of test date
+      dt <- dt[order(dt$datetime, decreasing = FALSE),]
+  
+  return(dt)
+}
+
+
+Sum.Stat.AirDecay.WP = function(dt, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")) {
   
   ## Test Variables
   # dt <- dt.AirDecay.WP.NoMaster
@@ -986,21 +1119,357 @@ Plot.SinglePoint.WP.ControlChart = function(dt, nominal, lsl, usl, Title){
   
   
   #prepare contorl lines for ave. chart
-  SpecLine.ave <- data.frame(ControlValue = c(lsl, nominal,  usl),
-                             ControlType = c("LSL", "Nominal",  "USL" ))
+  # SpecLine.ave <- data.frame(ControlValue = c(lsl, nominal,  usl),
+  #                            ControlType = c("LSL", "Nominal",  "USL" ))
   
   
   g.LT <- ggplot(dt, aes(x = dt$LeakTestDateTime, y=dt$air_decay_wp)) +
                   geom_line()+
                   geom_point()+
-                  geom_hline(data=SpecLine.ave, aes(yintercept=ControlValue, colour = ControlType ),  size=1) +
+                  # geom_hline(data=SpecLine.ave, aes(yintercept=ControlValue, colour = ControlType ),  size=1) +
+                  geom_hline(aes(yintercept=lsl, colour = 'LSL' ), linetype='dashed', show.legend = TRUE, size=1) +
+                  geom_hline(aes(yintercept=nominal, colour = 'Nominal' ),  linetype='solid', show.legend = TRUE, size=1) +
+                  geom_hline(aes(yintercept=usl, colour = 'USL' ), linetype='dashed', show.legend = TRUE, size=1) +             
                   xlab("Date/Time") +
                   ylab("Leak Rate") +
                   ggtitle(paste("QUK2 SH WJ Leak Rate - ", Title )) +
-                  scale_x_datetime(date_breaks = "6 hour", labels = date_format("%d/%b %H:00")) +
+                  scale_x_datetime(expand = c(0, 0), date_breaks = "6 hour", labels = date_format("%d/%b %H:00")) +
                   theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
   return(g.LT)
 }
+
+Plot.SinglePoint.WP.ControlChart.CombinedMaster = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2018-01-15")
+  # Date.End = as.Date("2018-01-20")
+
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start 
+                         & date(dt$LeakTestDateTime) <= Date.End, ]
+  
+  g.LT <- ggplot(dt, aes(x = dt$LeakTestDateTime, y=dt$air_decay_wp, shape= dt$CastMC_Die,colour = dt$CastMC_Die)) +
+                  scale_color_brewer(palette="Dark2") +
+                  # geom_line()+
+                  geom_point()+
+                  # geom_hline(data=SpecLine.ave, aes(yintercept=ControlValue, colour = ControlType ),  size=1) +
+                  geom_hline(aes(yintercept=lsl, colour = 'LSL' ), linetype='dashed', show.legend = TRUE, size=1) +
+                  geom_hline(aes(yintercept=nominal, colour = 'Nominal' ),  linetype='solid', show.legend = TRUE, size=1) +
+                  geom_hline(aes(yintercept=usl, colour = 'USL' ), linetype='dashed', show.legend = TRUE, size=1) +             
+                  xlab("Date/Time") +
+                  ylab("Leak Rate") +
+                  ggtitle(paste("QUK2 SH WJ Leak Rate - ", Title )) +
+                  scale_x_datetime(expand = c(0, 0), date_breaks = "6 hour", labels = date_format("%d/%b %H:00")) +
+                  theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  # subset master part data
+  dt.Master <- dt.Master[date(dt.Master$LeakTestDateTime) >= Date.Start 
+                                                    & date(dt.Master$LeakTestDateTime) <= Date.End 
+                                                    & dt.Master$part_id == ID.Master, ]
+  dt.Master <- dt.Master[order(dt.Master$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot Master Leak Rate into previous leak rate chart
+  g.LT <- g.LT + geom_point(data = dt.Master, aes(LeakTestDateTime, air_decay_wp, shape=part_id), color = 'red', size = 5)
+  
+  
+  return(g.LT)
+}
+
+
+Plot.SinglePoint.WP.ControlChart.SmallScale.CombinedMaster = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2018-01-15")
+  # Date.End = as.Date("2018-01-20")
+  
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start 
+           & date(dt$LeakTestDateTime) <= Date.End, ]
+  
+  g.LT <- ggplot(dt, aes(x = dt$LeakTestDateTime, y=dt$air_decay_wp, shape= dt$CastMC_Die,colour = dt$CastMC_Die)) +
+    scale_color_brewer(palette="Dark2") +
+    geom_line()+
+    geom_point()+
+    # geom_hline(data=SpecLine.ave, aes(yintercept=ControlValue, colour = ControlType ),  size=1) +
+    geom_hline(aes(yintercept=lsl, colour = 'LSL' ), linetype='dashed', show.legend = TRUE, size=1) +
+    geom_hline(aes(yintercept=nominal, colour = 'Nominal' ),  linetype='solid', show.legend = TRUE, size=1) +
+    geom_hline(aes(yintercept=usl, colour = 'USL' ), linetype='dashed', show.legend = TRUE, size=1) +             
+    xlab("Date/Time") +
+    ylab("Leak Rate") +
+    scale_y_continuous(limits = c(-4, 3)) + 
+    ggtitle(paste("QUK2 SH WJ Leak Rate - ", Title )) +
+    scale_x_datetime(expand = c(0, 0), date_breaks = "6 hour", labels = date_format("%d/%b %H:00")) +
+    theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  # subset master part data
+  dt.Master <- dt.Master[date(dt.Master$LeakTestDateTime) >= Date.Start 
+                         & date(dt.Master$LeakTestDateTime) <= Date.End 
+                         & dt.Master$part_id == ID.Master, ]
+  dt.Master <- dt.Master[order(dt.Master$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot Master Leak Rate into previous leak rate chart
+  g.LT <- g.LT + geom_point(data = dt.Master, aes(LeakTestDateTime, air_decay_wp, shape=part_id), color = 'red', size = 5)
+  
+  
+  return(g.LT)
+}
+
+
+Plot.SinglePoint.WP.Type1 = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to 
+  ## 1) subset data as per given period of time, 
+  ## 2) then plot the leak rate of individual parts and master part
+  ## 3) Plot leak rate trend as per casting date
+  
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2016-01-01")
+  # Date.End = as.Date("2030-01-01")
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start & date(dt$LeakTestDateTime) <= Date.End ,]
+  
+  dt <- dt[order(dt$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot leka rate chart combined with Master Part Data
+  g.LeakRate.WP <- Plot.SinglePoint.WP.ControlChart.CombinedMaster(dt, nominal, lsl, usl, 
+                     Title, dt.Master, ID.Master, 
+                     Date.Start, Date.End )
+
+  # Plot Leak Rate Chart by cast date / time
+  g.LeakRate.CastDate.WP <- Plot.SinglePoint.WP.ControlChart.CastTime(dt, nominal, lsl, usl, Title)
+  
+  
+  multiplot(g.LeakRate.WP, g.LeakRate.CastDate.WP, cols=1)
+
+}
+
+Plot.SinglePoint.WP.Type2 = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to 
+  ## 1) subset data as per given period of time, 
+  ## 2) then plot the leak rate of individual parts and master part
+  ## 3) Plot leak rate trend as per casting date
+  ## 4) Plot Temperatur and Humidity trend at the same period of time
+  
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2016-01-01")
+  # Date.End = as.Date("2030-01-01")
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start & date(dt$LeakTestDateTime) <= Date.End ,]
+  
+  dt <- dt[order(dt$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot leka rate chart combined with Master Part Data
+  g.LeakRate.WP <- Plot.SinglePoint.WP.ControlChart.CombinedMaster(dt, nominal, lsl, usl, 
+                                                                   Title, dt.Master, ID.Master, 
+                                                                   Date.Start, Date.End )
+  
+  # Plot Leak Rate Chart by cast date / time
+  g.LeakRate.CastDate.WP <- Plot.SinglePoint.WP.ControlChart.CastTime(dt, nominal, lsl, usl, Title)
+  
+  # Plot Temp and Humidity trend
+  g.Temp <- Plot.SinglePoint.Temp(dt.TempHumidity, "Assembly Cell Temp Trend",Date.Start, Date.End)
+  g.Humidity <- Plot.SinglePoint.Humidity(dt.TempHumidity, "Assembly Cell Humidity Trend",Date.Start, Date.End)
+  
+  
+  multiplot(g.LeakRate.WP, g.Temp, g.Humidity, g.LeakRate.CastDate.WP, cols=1)
+  
+}
+
+
+Plot.SinglePoint.WP.SmallScale.Type1 = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to 
+  ## 1) subset data as per given period of time within small scale, 
+  ## 2) then plot the leak rate of individual parts and master part
+  ## 3) Plot leak rate trend as per casting date
+  ## 4) Plot Temperatur and Humidity trend at the same period of time
+  
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2016-01-01")
+  # Date.End = as.Date("2030-01-01")
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start & date(dt$LeakTestDateTime) <= Date.End ,]
+  
+  dt <- dt[order(dt$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot leka rate chart combined with Master Part Data
+  g.LeakRate.WP <- Plot.SinglePoint.WP.ControlChart.SmallScale.CombinedMaster(dt, nominal, lsl, usl, 
+                                                                   Title, dt.Master, ID.Master, 
+                                                                   Date.Start, Date.End )
+  
+  # Plot Leak Rate Chart by cast date / time
+  g.LeakRate.CastDate.WP <- Plot.SinglePoint.WP.ControlChart.CastTime(dt, nominal, lsl, usl, Title)
+
+  multiplot(g.LeakRate.WP, g.LeakRate.CastDate.WP, cols=1)
+  
+}
+
+Plot.SinglePoint.WP.Type3 = function(dt, nominal, lsl, usl, Title, dt.Master, ID.Master, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to 
+  ## 1) subset data as per given period of time, 
+  ## 2) then plot the leak rate of individual parts and master part. 
+  ##      The leak rate will be ploted at small scale for better observation.
+  ## 3) Plot leak rate trend as per casting date
+  ## 4) Plot Temperatur and Humidity trend at the same period of time
+  
+  # #Var for testing
+  # dt <- dt.AirDecay.WP.NoMaster
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  # dt.Master <- dt.AirDecay.WP.Master
+  # ID.Master ='XBA1601290101A23'
+  # Date.Start = as.Date("2016-01-01")
+  # Date.End = as.Date("2030-01-01")
+  
+  dt <- dt[date(dt$LeakTestDateTime) >= Date.Start & date(dt$LeakTestDateTime) <= Date.End ,]
+  
+  dt <- dt[order(dt$LeakTestDateTime, decreasing = FALSE),]
+  
+  # Plot leka rate chart combined with Master Part Data
+  g.LeakRate.WP <- Plot.SinglePoint.WP.ControlChart.SmallScale.CombinedMaster(dt, nominal, lsl, usl, 
+                                                                   Title, dt.Master, ID.Master, 
+                                                                   Date.Start, Date.End )
+  
+  # Plot Leak Rate Chart by cast date / time
+  g.LeakRate.CastDate.WP <- Plot.SinglePoint.WP.ControlChart.CastTime(dt, nominal, lsl, usl, Title)
+  
+  # Plot Temp and Humidity trend
+  g.Temp <- Plot.SinglePoint.Temp(dt.TempHumidity, "Assembly Cell Temp Trend",Date.Start, Date.End)
+  g.Humidity <- Plot.SinglePoint.Humidity(dt.TempHumidity, "Assembly Cell Humidity Trend",Date.Start, Date.End)
+  
+  
+  multiplot(g.LeakRate.WP, g.Temp, g.Humidity, g.LeakRate.CastDate.WP, cols=1)
+  
+}
+
+Plot.SinglePoint.Temp = function(dt, Title, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to plot the trend of temp and humidity of the assembly Cell
+  
+  # # Var for testing
+  # dt <- dt.TempHumidity
+  # Title = "Assembly Cell Temp Trend"
+  # Date.Start = as.Date("2018-01-15")
+  # Date.End = as.Date("2018-01-20")
+  
+  dt <- dt[date(dt$Date.Time) >= Date.Start & date(dt$Date.Time) <= Date.End ,]
+  
+  dt <- dt[order(dt$Date.Time, decreasing = FALSE),]
+  
+  g <- ggplot(dt, aes(x = dt$Date.Time, y=dt$Temperature, shape="Temperature"), colour='red') +
+    geom_line()+
+    geom_point()+
+    # stat_smooth(aes(x=dt$Date.Time, y=dt$Temperature), formula = y ~ s(x, k = 24), method = "gam", se = FALSE) +
+    xlab("Date/Time") +
+    ylab("Temperature") +
+    ggtitle(paste(Title, " ", Date.Start,"-", Date.End )) +
+    # scale_x_datetime(date_breaks = "1 day", labels = date_format("%d/%b")) +
+    scale_x_datetime(date_breaks = "12 hour", labels = date_format("%d/%b %H:%M"), expand = c(0, 0),
+                     limits = c(floor_date(min(dt$Date.Time), "day"), ceiling_date(max(dt$Date.Time), "day"))) +
+    theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  return(g)
+  
+}
+
+Plot.SinglePoint.Humidity = function(dt, Title, Date.Start = as.Date("2016-01-01"), Date.End = as.Date("2030-01-01")){
+  
+  ## This function is to plot the trend of temp and humidity of the assembly Cell
+  
+  #Var for testing
+  # dt <- dt.TempHumidity
+  # Title = "Assembly Temp Trend"
+  # Date.Start = as.Date("2018-02-01")
+  # Date.End = as.Date("2018-02-05")
+  
+  dt <- dt[date(dt$Date.Time) >= Date.Start & date(dt$Date.Time) <= Date.End ,]
+  
+  dt <- dt[order(dt$Date.Time, decreasing = FALSE),]
+  
+  g <- ggplot(dt, aes(x = dt$Date.Time, y=dt$RelativeHumidity, shape="Humidity"), colour='blue') +
+    geom_line()+
+    geom_point()+
+    # stat_smooth(aes(x=dt$Date.Time, y=dt$RelativeHumidity), formula = y ~ s(x, k = 24), method = "gam", se = FALSE) +
+    xlab("Date/Time") +
+    ylab("Humidity") +
+    ggtitle(paste(Title, " ", Date.Start,"-", Date.End )) +
+    scale_x_datetime(date_breaks = "12 hour", labels = date_format("%d/%b %H:%M"), expand = c(0, 0),
+                     limits = c(floor_date(min(dt$Date.Time), "day"), ceiling_date(max(dt$Date.Time), "day"))) +
+    theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  return(g)
+  
+}
+
+
+
+Plot.SinglePoint.WP.ControlChart.CastTime = function(dt, nominal, lsl, usl, Title){
+  # #Var for testing
+  # dt <- dt.ng.Rule2
+  # nominal = 0
+  # lsl = -3
+  # usl = 2.1
+  # Title = "Air Decay WP"
+  
+  
+  # #prepare contorl lines for ave. chart
+  # SpecLine.ave <- data.frame(ControlValue = c(lsl, nominal,  usl),
+  #                            ControlType = c("LSL", "Nominal",  "USL" ))
+  
+  
+  g.LT <- ggplot(dt, aes(x = dt$CastDateTime, y=dt$air_decay_wp, shape= dt$CastMC_Die,colour = dt$CastMC_Die)) +
+    scale_color_brewer(palette="Dark2") +
+    # geom_line()+
+    geom_point()+
+    # geom_hline(data=SpecLine.ave, aes(yintercept=ControlValue, linetype = ControlType ), size=1) +
+    geom_hline(aes(yintercept=lsl, colour = 'LSL' ), linetype='dashed', show.legend = TRUE, size=1) +
+    geom_hline(aes(yintercept=nominal, colour = 'Nominal' ),  linetype='solid', show.legend = TRUE, size=1) +
+    geom_hline(aes(yintercept=usl, colour = 'USL' ), linetype='dashed', show.legend = TRUE, size=1) +
+    xlab("Cast Date/Time") +
+    ylab("Leak Rate") +
+    ggtitle(paste("QUK2 SH WJ Leak Rate by Cast Date/Time - ", Title )) +
+    scale_x_datetime(expand = c(0, 0), date_breaks = "1 day", labels = date_format("%d/%b")) +
+    theme(text = element_text(size=10),axis.text.x = element_text(angle = 90, hjust = 1))
+  return(g.LT)
+}
+
 
 Plot.SinglePoint.WP.LeakRate.Dynamic = function(dt, nominal, lsl, usl, Title){
   # #Var for testing

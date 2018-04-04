@@ -7,9 +7,12 @@ Required_Packages=c("openxlsx", "data.table", "splitstackshape", "dplyr","tidyr"
 
 Install_And_Load(Required_Packages)
 
+#Setup File Names
 File.LeakTestStation <- c("DataSource/QUK2SH_WJ_Leak_Rate.tsv")
 File.TempHumidity <- c("DataSource/TempRecord.tsv")
 File.Inspection <- c("DataSource/GateInspection2017-18.tsv")
+File.Pinning <- c("DataSource/QUK2SH_WJ_Pinning.tsv")
+File.FIPG <- c("DataSource/QUK2SH_WJ_FIPG_Bolting.tsv")
 
 ##################################################################################################################
 ## Extract raw data from tsv file. 
@@ -29,6 +32,18 @@ Extract.TempHumidity(File.TempHumidity)
 ## data was saved as "DataOutput/dt.Inspection.Full.RDS"
 ## Duplicates was not removed
 Extract.InspectionData(File.Inspection)
+
+
+## Extract data from Pinning Station
+## Duplicates was not removed
+## data was saved as "DataOutput/dt.Pinning.RDS"
+Extract.PinningStation(File.Pinning)
+
+
+## Extract data from FIPG Station
+## Duplicates was not removed
+## data was saved as "DataOutput/dt.FIPG.RDS"
+Extract.FIPGStation(File.FIPG)
 
 
 ## Process leak test data. 
@@ -59,7 +74,7 @@ saveRDS(dt.AirDecay.He.NoMaster, "DataOutput/dt.AirDecay.He.NoMaster.RDS")
 ## Extract data of master parts for comparison
 ## Assemble casting date / time based on barcode. Records with incorrect barcode format will be dropped.
 ## Convert some columns into factor
-## Only record with part id in tge master part list were kept
+## Only record with part id in the master part list were kept
 dt.AirDecay.WP.Master <- Process.LeakTest.Master.Data(dt.AirDecay.WP.Full)
 dt.AirDecay.MC.Master <- Process.LeakTest.Master.Data(dt.AirDecay.MC.Full)
 dt.AirDecay.He.Master <- Process.LeakTest.Master.Data(dt.AirDecay.He.Full)
